@@ -14,15 +14,16 @@ from autoload import autoload
 
 class AutoloadTest(unittest.TestCase):
 
-    def __init__(self):
+    def __init__(self,args):
         # Change these values to reflect local setup
         urlbase = "http://localhost:8000"
         authorization = {'authorization':'demo@example.com:3a3ba54fe467e7e2f239b0e5f9bc24c446b811e3'}
-        file_patj
-        self.loader = AutoLoad(urlbase,authorization)
+        self.loader = autoload.AutoLoad(urlbase,authorization)
+        unittest.TestCase.__init__(self,args)
 
+    # Tests tha all api calls made by the loader are successfull
     def test_autoload(self):
-        mappings = [{"from_field": "Address",
+        col_mappings = [{"from_field": "Address",
                      "to_field": "address_line_1",
                      "to_table_name": "PropertyState",
                     },
@@ -30,9 +31,45 @@ class AutoloadTest(unittest.TestCase):
                      "to_field": "city",
                      "to_table_name": "PropertyState",
                     }]
-        self.autoload.autoload_file("../test.csv","TEST","1","1", mappings)
+        file_handle = open('test.csv','r')
+        dataset_name = 'TEST'
+        cycle_id = '1'
+        org_id = '1'
 
-        
+        # make a new data set
+        resp = self.loader.create_dataset(dataset_name, org_id)
+        self.assertEqual(resp['status'], 'success')
+        dataset_id = resp['id']
+
+        # upload and save to Property state table
+        resp = self.loader.upload(file_handle,dataset_id)
+        self.assertEqual(resp['success'], True)
+        file_id = resp['import_file_id']
+
+        resp = self.loader.save_raw_data(file_id,cycle_id)
+        self.assertEqual(resp['status'], 'not-started')
+        save_prog_key = resp['progress_key']
+        self.loader.wait_for_task(save_prog_key)
+
+
+        # perform column mapping
+        self.loader.save_column_mappings(org_id, file_id, col_mappings)
+        resp = self.loader.perform_mapping(file_id)
+        self.assertEqual(resp['status'], 'success')
+        map_prog_key = resp['progress_key']
+
+        self.loader.wait_for_task(map_prog_key)
+        resp = self.loader.mapping_done(file_id,org_id)
+        self.assertEqual(resp['status'], 'success')
+
+
+        # attempt to match with existing records
+        resp = self.loader.start_system_matching(file_id)
+        self.assertEqual(resp['status'], 'success')
+        match_prog_key = resp['progress_key']
+        self.loader.wait_for_task(match_prog_key)
+
+
     def test_is_string(self):
         print self
         s = autoload.test()
