@@ -14,23 +14,31 @@ class AutoLoad:
         self.url_base = url_base
         self.auth = auth
 
-    def autoload_file(self, file_path, dataset_name, cycle_id, org_id, col_mappings):
+    def autoload_file(self, file_handle, dataset_name, cycle_id, org_id, col_mappings):
         # make a new data set
-        dataset_id = self.create_dataset(dataset_name, org_id)
+        resp = self.create_dataset(dataset_name, org_id)
+        dataset_id = resp['id']
 
         # upload and save to Property state table
-        file_id = self.upload(file_path,dataset_id)
-        save_prog_key = self.save_raw_data(file_id,cycle_id)
+        resp = self.upload(file_handle,dataset_id)
+        file_id = resp['import_file_id']
+
+        resp = self.save_raw_data(file_id,cycle_id)
+        save_prog_key = resp['progress_key']
         self.wait_for_task(save_prog_key)
 
         # perform column mapping
         self.save_column_mappings(org_id, file_id, col_mappings)
-        map_prog_key = self.perform_mapping(file_id)
+
+        resp = self.perform_mapping(file_id)
+        map_prog_key = resp['progress_key']
+
         self.wait_for_task(map_prog_key)
         self.mapping_done(file_id,org_id)
 
         # attempt to match with existing records
-        match_prog_key = self.start_system_matching(file_id)
+        resp = self.start_system_matching(file_id)
+        match_prog_key = resp['progress_key']
         self.wait_for_task(match_prog_key)
 
     """Make repeated calls to progress API endpoint until progress is
@@ -61,15 +69,14 @@ class AutoLoad:
 
         r = requests.post(url,headers=self.auth,data=form_data)
 
-        record_id = r.json()['id']
-        return record_id
+        return r.json()
 
     """Upload a file to the specified import record"""
-    def upload(self, file_path, record_id):
+    def upload(self, file_handle, record_id):
         url = self.url_base + '/api/v2/upload/'
 
         upload = {
-            'qqfile' : open(file_path,'r'),
+            'qqfile' : file_handle,
         }
 
         form_data = {
@@ -78,8 +85,8 @@ class AutoLoad:
 
         r = requests.post(url,headers=self.auth,files=upload,data=form_data)
 
-        file_id = r.json()['import_file_id']
-        return file_id
+        return r.json()
+
 
     """Initiate task on seed server to save file data into propertystate
        table"""
@@ -92,8 +99,7 @@ class AutoLoad:
 
         r = requests.post(url,headers=self.auth,data=form_data)
 
-        progress_key = r.json()['progress_key']
-        return progress_key
+        return r.json()
 
 
     """Tell the seed server how to map between the fields in the input file and
@@ -122,6 +128,7 @@ class AutoLoad:
 
         # also note data must be run through json.dumps before posting
         r = requests.post(url,headers=head,data=json.dumps(data))
+        return r.json()
 
     """ Populate fields in PropertyState according to previously established
         Mapping"""
@@ -129,9 +136,8 @@ class AutoLoad:
         url = self.url_base + '/api/v2/import_files/%(file_id)s/perform_mapping/' % {'file_id':file_id}
 
         r = requests.post(url,headers=self.auth)
+        return r.json()
 
-        progress_key = r.json()['progress_key']
-        return progress_key
 
     """ The server needs to be informed that we are finished with all mapping
         for this file. Not sure what exactly this does but it seems important"""
@@ -140,6 +146,8 @@ class AutoLoad:
 
         r = requests.put(url,headers=self.auth,params={"organization_id":org_id})
 
+        return r.json()
+
     """ Attempts to find existing entries in PropertyState that correspond to the
         same property that was uploaded and merge them into a new entry"""
     def start_system_matching(self, file_id):
@@ -147,5 +155,4 @@ class AutoLoad:
 
         r = requests.post(url,headers=self.auth)
 
-        progress_key = r.json()['progress_key']
-        return progress_key
+        return r.json()
