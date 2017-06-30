@@ -23,21 +23,20 @@ class AutoLoad:
         resp = self.upload(file_handle,dataset_id)
         file_id = resp['import_file_id']
 
-        resp = self.save_raw_data(file_id,cycle_id)
+        resp = self.save_raw_data(file_id,cycle_id,org_id)
         save_prog_key = resp['progress_key']
         self.wait_for_task(save_prog_key)
 
         # perform column mapping
         self.save_column_mappings(org_id, file_id, col_mappings)
-
-        resp = self.perform_mapping(file_id)
+        resp = self.perform_mapping(file_id,org_id)
         map_prog_key = resp['progress_key']
 
         self.wait_for_task(map_prog_key)
-        self.mapping_done(file_id,org_id)
+        resp = self.mapping_done(file_id,org_id)
 
         # attempt to match with existing records
-        resp = self.start_system_matching(file_id)
+        resp = self.start_system_matching(file_id,org_id)
         match_prog_key = resp['progress_key']
         self.wait_for_task(match_prog_key)
 
@@ -53,7 +52,6 @@ class AutoLoad:
         progress = 0
         while progress < 100:
             r = requests.post(url,headers=self.auth,data=data)
-            print r.json()
             progress = int(r.json()['progress'])
             # delay before next request to limit number of requests sent to server
             sleep(0.5)
@@ -90,14 +88,14 @@ class AutoLoad:
 
     """Initiate task on seed server to save file data into propertystate
        table"""
-    def save_raw_data(self, file_id, cycle_id):
+    def save_raw_data(self, file_id, cycle_id, org_id):
         url = self.url_base + '/api/v2/import_files/%(file_id)s/save_raw_data/' % {'file_id' : file_id}
 
         form_data = {
             'cycle_id' : cycle_id
         }
 
-        r = requests.post(url,headers=self.auth,data=form_data)
+        r = requests.post(url,headers=self.auth,data=form_data,params={"organization_id":org_id})
 
         return r.json()
 
@@ -127,15 +125,15 @@ class AutoLoad:
         head.update(self.auth)
 
         # also note data must be run through json.dumps before posting
-        r = requests.post(url,headers=head,data=json.dumps(data))
+        r = requests.post(url,headers=head,data=json.dumps(data),params={"organization_id":org_id})
         return r.json()
 
     """ Populate fields in PropertyState according to previously established
         Mapping"""
-    def perform_mapping(self, file_id):
+    def perform_mapping(self, file_id, org_id):
         url = self.url_base + '/api/v2/import_files/%(file_id)s/perform_mapping/' % {'file_id':file_id}
 
-        r = requests.post(url,headers=self.auth)
+        r = requests.post(url,headers=self.auth,params={"organization_id":org_id})
         return r.json()
 
 
@@ -150,9 +148,9 @@ class AutoLoad:
 
     """ Attempts to find existing entries in PropertyState that correspond to the
         same property that was uploaded and merge them into a new entry"""
-    def start_system_matching(self, file_id):
+    def start_system_matching(self, file_id, org_id):
         url = self.url_base + '/api/v2/import_files/%(file_id)s/start_system_matching/' % {'file_id':file_id}
 
-        r = requests.post(url,headers=self.auth)
+        r = requests.post(url,headers=self.auth,params={"organization_id":org_id})
 
         return r.json()

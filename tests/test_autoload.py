@@ -46,7 +46,7 @@ class AutoloadTest(unittest.TestCase):
         self.assertEqual(resp['success'], True)
         file_id = resp['import_file_id']
 
-        resp = self.loader.save_raw_data(file_id,cycle_id)
+        resp = self.loader.save_raw_data(file_id,cycle_id,org_id)
         self.assertEqual(resp['status'], 'not-started')
         save_prog_key = resp['progress_key']
         self.loader.wait_for_task(save_prog_key)
@@ -54,7 +54,7 @@ class AutoloadTest(unittest.TestCase):
 
         # perform column mapping
         self.loader.save_column_mappings(org_id, file_id, col_mappings)
-        resp = self.loader.perform_mapping(file_id)
+        resp = self.loader.perform_mapping(file_id,org_id)
         self.assertEqual(resp['status'], 'success')
         map_prog_key = resp['progress_key']
 
@@ -64,7 +64,7 @@ class AutoloadTest(unittest.TestCase):
 
 
         # attempt to match with existing records
-        resp = self.loader.start_system_matching(file_id)
+        resp = self.loader.start_system_matching(file_id,org_id)
         self.assertEqual(resp['status'], 'success')
         match_prog_key = resp['progress_key']
         self.loader.wait_for_task(match_prog_key)
