@@ -2,6 +2,7 @@
 import unittest
 
 from autoload import autoload
+import StringIO
 
 # These tests assume that the seed server is running at the location specified
 # in urlbase. It might be a good idea to have the test suite start the server
@@ -27,11 +28,11 @@ class AutoloadTest(unittest.TestCase):
                      "to_field": "address_line_1",
                      "to_table_name": "PropertyState",
                     },
-                    {"from_field": "City",
-                     "to_field": "city",
+                    {"from_field": "Score",
+                     "to_field": "energy_score",
                      "to_table_name": "PropertyState",
                     }]
-        file_handle = open('test.csv','r')
+        file_handle = StringIO.StringIO('Address,klfjgkldsjg\n123 Test Road,100')
         dataset_name = 'TEST'
         cycle_id = '1'
         org_id = '1'
