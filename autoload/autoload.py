@@ -166,3 +166,62 @@ class AutoLoad:
         r = requests.post(url,auth=self.auth,params={"organization_id":org_id})
 
         return r.json()
+
+    """ adds a green_assessment_property to a recently uploaded property.
+        If another file has been merged with the property since the file with
+        the given id was uploaded then this method will fail.
+
+        assesssment_data must be a dictionart with entries:
+            :Parameter: source
+            :Description:  source of this certification e.g. assessor
+            :required: false
+            :Parameter: status
+            :Description:  status for multi-step processes
+            :required: false
+            :Parameter: status_date
+            :Description:  date status first applied
+            :required: false
+            :Parameter: metric
+            :Description:  score if value is numeric
+            :required: false
+            :Parameter: rating
+            :Description:  score if value is non-numeric
+            :required: false
+            :Parameter: version
+            :Description:  version of certification issued
+            :required: false
+            :Parameter: date
+            :Description:  date certification issued  ``YYYY-MM-DD``
+            :required: false
+            :Parameter: target_date
+            :Description:  date achievement expected ``YYYY-MM-DD``
+            :required: false
+            :Parameter: eligibility
+            :Description:  BEDES eligible if true
+            :required: false
+            :Parameter: urls
+            :Description:  array of related green assessment urls
+            :required: false
+            :Parameter: assessment
+            :Description:  id of associated green assessment
+    """
+    def create_green_assessment_property(self, file_id, assessment_data, org_id):
+        # Retreive list of property views
+        url = self.url_base + '/api/v2/property_views/'
+
+        r = requests.get(url,auth=self.auth)
+
+        # Find property with file_id and correct source type
+        views = r.json()['property_views']
+        filter(lambda p:p['state']['import_file_id'] == file_id,views)
+
+        #should give meaningfull error when views is emptyk
+        view = views[0]
+
+        # Create a green_assessment_property associated with this view
+        url = self.url_base + '/api/v2/green_assessment_properties/'
+        assessment_data.update({"view":view['id']})
+
+        r = requests.post(url,auth=self.auth,data=assessment_data,params={"organization_id":org_id})
+
+        return r.json()
