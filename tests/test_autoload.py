@@ -68,6 +68,34 @@ class AutoloadTest(unittest.TestCase):
         match_prog_key = resp['progress_key']
         self.loader.wait_for_task(match_prog_key)
 
+    def test_green_assessment_property(self):
+        col_mappings = [{"from_field": "Address",
+                     "to_field": "address_line_1",
+                     "to_table_name": "PropertyState",
+                    },
+                    {"from_field": "Score",
+                     "to_field": "energy_score",
+                     "to_table_name": "PropertyState",
+                    }]
+        file_handle = StringIO.StringIO('Address,klfjgkldsjg\n123 Test Road,100')
+        dataset_name = 'TEST'
+        cycle_id = '1'
+        org_id = '1'
+
+        resp = self.loader.autoload_file(file_handle,dataset_name,cycle_id,org_id,col_mappings)
+        # check that the upload of initial data succeeds
+        self.assertEqual(resp['status'],'success')
+        file_id = resp['import_file_id']
+
+        green_assessment = {"source":"home energy score",
+                            "metric":10,
+                            "date":"2017-07-10",
+                            "assessment":"1"}
+
+        resp = self.loader.create_green_assessment_property(file_id,green_assessment,org_id)
+
+        self.assertEqual(resp['status'],'success')
+
     def test_is_string(self):
         print self
         s = autoload.test()
