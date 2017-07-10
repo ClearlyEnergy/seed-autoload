@@ -18,6 +18,8 @@ class AutoLoad:
     def autoload_file(self, file_handle, dataset_name, cycle_id, org_id, col_mappings):
         # make a new data set
         resp = self.create_dataset(dataset_name, org_id)
+        if (resp['status'] == 'error'):
+            return resp
         dataset_id = resp['id']
 
         # upload and save to Property state table
@@ -25,22 +27,31 @@ class AutoLoad:
         file_id = resp['import_file_id']
 
         resp = self.save_raw_data(file_id,cycle_id,org_id)
+        if (resp['status'] == 'error'):
+            return resp
         save_prog_key = resp['progress_key']
         self.wait_for_task(save_prog_key)
 
         # perform column mapping
         self.save_column_mappings(org_id, file_id, col_mappings)
         resp = self.perform_mapping(file_id,org_id)
+        if (resp['status'] == 'error'):
+            return resp
         map_prog_key = resp['progress_key']
 
         self.wait_for_task(map_prog_key)
         resp = self.mapping_done(file_id,org_id)
+        if (resp['status'] == 'error'):
+            return resp
 
         # attempt to match with existing records
         resp = self.start_system_matching(file_id,org_id)
+        if (resp['status'] == 'error'):
+            return resp
         match_prog_key = resp['progress_key']
         self.wait_for_task(match_prog_key)
 
+        return {'status':'success','import_file_id':file_id}
 
     """Make repeated calls to progress API endpoint until progress is
        Reported to be completed (progress == 100)"""
