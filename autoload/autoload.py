@@ -1,4 +1,5 @@
 import requests
+from requests.auth import HTTPBasicAuth
 import json
 from time import sleep
 
@@ -10,9 +11,9 @@ def test():
    (localhost:8000) and a valid user/api key pair. Auth information should be
    provided as a dictionary {"Authorization":"user:api_key"}"""
 class AutoLoad:
-    def __init__(self, url_base, auth):
+    def __init__(self, url_base, user, key):
         self.url_base = url_base
-        self.auth = auth
+        self.auth = HTTPBasicAuth(user,key)
 
     def autoload_file(self, file_handle, dataset_name, cycle_id, org_id, col_mappings):
         # make a new data set
@@ -40,6 +41,7 @@ class AutoLoad:
         match_prog_key = resp['progress_key']
         self.wait_for_task(match_prog_key)
 
+
     """Make repeated calls to progress API endpoint until progress is
        Reported to be completed (progress == 100)"""
     def wait_for_task(self, key):
@@ -51,7 +53,7 @@ class AutoLoad:
 
         progress = 0
         while progress < 100:
-            r = requests.post(url,headers=self.auth,data=data)
+            r = requests.post(url,auth=self.auth,data=data)
             progress = int(r.json()['progress'])
             # delay before next request to limit number of requests sent to server
             sleep(0.5)
@@ -65,7 +67,7 @@ class AutoLoad:
             'name' : name
         }
 
-        r = requests.post(url,headers=self.auth,data=form_data)
+        r = requests.post(url,auth=self.auth,data=form_data)
 
         return r.json()
 
@@ -81,7 +83,7 @@ class AutoLoad:
             'import_record' : record_id
         }
 
-        r = requests.post(url,headers=self.auth,files=upload,data=form_data)
+        r = requests.post(url,auth=self.auth,files=upload,data=form_data)
 
         return r.json()
 
@@ -95,7 +97,7 @@ class AutoLoad:
             'cycle_id' : cycle_id
         }
 
-        r = requests.post(url,headers=self.auth,data=form_data,params={"organization_id":org_id})
+        r = requests.post(url,auth=self.auth,data=form_data,params={"organization_id":org_id})
 
         return r.json()
 
@@ -122,10 +124,9 @@ class AutoLoad:
 
         # This requests requires content-type to be json
         head = {'Content-Type': 'application/json'}
-        head.update(self.auth)
 
         # also note data must be run through json.dumps before posting
-        r = requests.post(url,headers=head,data=json.dumps(data),params={"organization_id":org_id})
+        r = requests.post(url,headers=head,auth=self.auth,data=json.dumps(data),params={"organization_id":org_id})
         return r.json()
 
     """ Populate fields in PropertyState according to previously established
@@ -133,7 +134,7 @@ class AutoLoad:
     def perform_mapping(self, file_id, org_id):
         url = self.url_base + '/api/v2/import_files/%(file_id)s/perform_mapping/' % {'file_id':file_id}
 
-        r = requests.post(url,headers=self.auth,params={"organization_id":org_id})
+        r = requests.post(url,auth=self.auth,params={"organization_id":org_id})
         return r.json()
 
 
@@ -142,7 +143,7 @@ class AutoLoad:
     def mapping_done(self, file_id, org_id):
         url = self.url_base + '/api/v2/import_files/%(file_id)s/mapping_done/' % {'file_id':file_id}
 
-        r = requests.put(url,headers=self.auth,params={"organization_id":org_id})
+        r = requests.put(url,auth=self.auth,params={"organization_id":org_id})
 
         return r.json()
 
@@ -151,6 +152,6 @@ class AutoLoad:
     def start_system_matching(self, file_id, org_id):
         url = self.url_base + '/api/v2/import_files/%(file_id)s/start_system_matching/' % {'file_id':file_id}
 
-        r = requests.post(url,headers=self.auth,params={"organization_id":org_id})
+        r = requests.post(url,auth=self.auth,params={"organization_id":org_id})
 
         return r.json()

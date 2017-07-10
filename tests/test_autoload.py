@@ -12,14 +12,12 @@ import StringIO
 # make changes to the database that the server connects to. It would be ideal 
 # to have the tests reverse all changes or perhaps make changes to some 
 # temporary test db.
-
 class AutoloadTest(unittest.TestCase):
 
     def __init__(self,args):
         # Change these values to reflect local setup
         urlbase = "http://localhost:8000"
-        authorization = {'authorization':'demo@example.com:3a3ba54fe467e7e2f239b0e5f9bc24c446b811e3'}
-        self.loader = autoload.AutoLoad(urlbase,authorization)
+        self.loader = autoload.AutoLoad(urlbase,'demo@example.com','676e837f22c17b6321a58d03ea0333a058005a20')
         unittest.TestCase.__init__(self,args)
 
     # Tests tha all api calls made by the loader are successfull
@@ -69,7 +67,6 @@ class AutoloadTest(unittest.TestCase):
         self.assertEqual(resp['status'], 'success')
         match_prog_key = resp['progress_key']
         self.loader.wait_for_task(match_prog_key)
-
 
     def test_is_string(self):
         print self
