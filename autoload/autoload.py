@@ -211,11 +211,16 @@ class AutoLoad:
 
         r = requests.get(url,auth=self.auth)
 
+        if (r.json()['status'] == 'error'):
+            return r.json()
+
         # Find property with file_id and correct source type
         views = r.json()['property_views']
         filter(lambda p:p['state']['import_file_id'] == file_id,views)
 
-        #should give meaningfull error when views is emptyk
+        if (len(views) == 0):
+            return {'status':'error'}`
+
         view = views[0]
 
         # Create a green_assessment_property associated with this view
