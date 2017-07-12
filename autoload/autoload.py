@@ -1,51 +1,56 @@
-import requests
+import os
+
 from requests.auth import HTTPBasicAuth
-import json
-from time import sleep
+import requests
+
+from django.core.files.storage import FileSystemStorage
+from django.conf import settings
+from django.utils import timezone
+
+import seed.data_importer.tasks as tasks
+from seed.models import (
+    Cycle,
+    Column)
+from seed.data_importer.models import (
+    ImportFile,
+    ImportRecord
+)
+from seed.utils.cache import get_cache
 
 def test():
     """Entry point for the application script"""
     return("Call your main application code here")    
 
-"""Initialize an instance of this class with the location of the seed sever
-   (localhost:8000) and a valid user/api key pair. Auth information should be
-   provided as a dictionary {"Authorization":"user:api_key"}"""
 class AutoLoad:
-    def __init__(self, url_base, user, key):
-        self.url_base = url_base
-        self.auth = HTTPBasicAuth(user,key)
+    def __init__(self, user, org):
+        self.org = org
+        self.user = user
 
-    def autoload_file(self, file_handle, dataset_name, cycle_id, org_id, col_mappings):
+    def autoload_file(self, file_handle, dataset_name, cycle_id,  col_mappings):
         # make a new data set
-        resp = self.create_dataset(dataset_name, org_id)
-        if (resp['status'] == 'error'):
-            return resp
-        dataset_id = resp['id']
+        dataset_id =  self.create_dataset(dataset_name)
 
         # upload and save to Property state table
-        resp = self.upload(file_handle,dataset_id)
-        file_id = resp['import_file_id']
+        file_id = self.upload(file_handle, dataset_id, cycle_id)
 
-        resp = self.save_raw_data(file_id,cycle_id,org_id)
+        resp = self.save_raw_data(file_id)
         if (resp['status'] == 'error'):
             return resp
         save_prog_key = resp['progress_key']
         self.wait_for_task(save_prog_key)
 
         # perform column mapping
-        self.save_column_mappings(org_id, file_id, col_mappings)
-        resp = self.perform_mapping(file_id,org_id)
+        self.save_column_mappings(file_id, col_mappings)
+        resp = self.perform_mapping(file_id)
         if (resp['status'] == 'error'):
             return resp
         map_prog_key = resp['progress_key']
 
         self.wait_for_task(map_prog_key)
-        resp = self.mapping_done(file_id,org_id)
-        if (resp['status'] == 'error'):
-            return resp
+        self.mapping_done(file_id)
 
         # attempt to match with existing records
-        resp = self.start_system_matching(file_id,org_id)
+        resp = self.start_system_matching(file_id)
         if (resp['status'] == 'error'):
             return resp
         match_prog_key = resp['progress_key']
@@ -56,62 +61,54 @@ class AutoLoad:
     """Make repeated calls to progress API endpoint until progress is
        Reported to be completed (progress == 100)"""
     def wait_for_task(self, key):
-        url = self.url_base + '/api/v2/progress/'
-
-        data = {
-            'progress_key' : key
-        }
-
-        progress = 0
-        while progress < 100:
-            r = requests.post(url,auth=self.auth,data=data)
-            progress = int(r.json()['progress'])
-            # delay before next request to limit number of requests sent to server
-            sleep(0.5)
+        prog = 0
+        while prog < 100:
+            prog = int(get_cache(key)['progress'])
 
     """Create a new import record for the specified organization with the
        specified name"""
-    def create_dataset(self, name, org_id):
-        url = self.url_base + '/api/v2/datasets/?organization_id=' + org_id
-
-        form_data = {
-            'name' : name
-        }
-
-        r = requests.post(url,auth=self.auth,data=form_data)
-
-        return r.json()
+    def create_dataset(self, name):
+        record = ImportRecord.objects.create(
+                name=name,
+                app='seed',
+                start_time=timezone.now(),
+                created_at=timezone.now(),
+                last_modified_by = self.user,
+                super_organization = self.org,
+                owner = self.user
+        )
+        return record.id
 
     """Upload a file to the specified import record"""
-    def upload(self, file_handle, record_id):
-        url = self.url_base + '/api/v2/upload/'
+    def upload(self, the_file, record_id, cycle_id):
+        filename = "autoload"
+        path = settings.MEDIA_ROOT + "/uploads/" + filename
+        path = FileSystemStorage().get_available_name(path)
 
-        upload = {
-            'qqfile' : file_handle,
-        }
+        # verify the directory exists
+        if not os.path.exists(os.path.dirname(path)):
+            os.makedirs(os.path.dirname(path))
 
-        form_data = {
-            'import_record' : record_id
-        }
+        # save the file
+        with open(path, 'wb+') as temp_file:
+            for line in the_file:
+                temp_file.write(line)
 
-        r = requests.post(url,auth=self.auth,files=upload,data=form_data)
+        record = ImportRecord.objects.get(pk=record_id)
 
-        return r.json()
-
+        f = ImportFile.objects.create(
+                import_record = record,
+                uploaded_filename = filename,
+                file=path,
+                cycle = Cycle.objects.get(pk=cycle_id),
+                source_type="Assessed Raw")
+        return f.pk
 
     """Initiate task on seed server to save file data into propertystate
        table"""
-    def save_raw_data(self, file_id, cycle_id, org_id):
-        url = self.url_base + '/api/v2/import_files/%(file_id)s/save_raw_data/' % {'file_id' : file_id}
-
-        form_data = {
-            'cycle_id' : cycle_id
-        }
-
-        r = requests.post(url,auth=self.auth,data=form_data,params={"organization_id":org_id})
-
-        return r.json()
-
+    def save_raw_data(self, file_id):
+        r = tasks.save_raw_data(file_id)
+        return r
 
     """Tell the seed server how to map between the fields in the input file and
        those in the PropertyState table
@@ -127,45 +124,36 @@ class AutoLoad:
          "to_table_name": "PropertyState",
         }],
     """
-    def save_column_mappings(self, org_id, file_id, mappings):
-        url = self.url_base + '/api/v2/import_files/%(file_id)s/save_column_mappings/' % {'file_id':file_id}
+    def save_column_mappings(self, file_id, mappings):
+        import_file = ImportFile.objects.get(pk=file_id)
+        org = self.org
+        status1 = Column.create_mappings(mappings,org,self.user)
 
-        data = {"organization_id": org_id}
-        data.update({"mappings":mappings})
+        column_mappings = [
+            {'from_field': m['from_field'],
+             'to_field': m['to_field'],
+             'to_table_name': m['to_table_name']} for m in mappings]
 
-        # This requests requires content-type to be json
-        head = {'Content-Type': 'application/json'}
-
-        # also note data must be run through json.dumps before posting
-        r = requests.post(url,headers=head,auth=self.auth,data=json.dumps(data),params={"organization_id":org_id})
-        return r.json()
+        if status1:
+            import_file.save_cached_mapped_columns(column_mappings)
+            return {'status':'success'}
+        else:
+            return {'status':'error'}
 
     """ Populate fields in PropertyState according to previously established
         Mapping"""
-    def perform_mapping(self, file_id, org_id):
-        url = self.url_base + '/api/v2/import_files/%(file_id)s/perform_mapping/' % {'file_id':file_id}
-
-        r = requests.post(url,auth=self.auth,params={"organization_id":org_id})
-        return r.json()
-
+    def perform_mapping(self, file_id):
+        return tasks.map_data(file_id)
 
     """ The server needs to be informed that we are finished with all mapping
         for this file. Not sure what exactly this does but it seems important"""
-    def mapping_done(self, file_id, org_id):
-        url = self.url_base + '/api/v2/import_files/%(file_id)s/mapping_done/' % {'file_id':file_id}
-
-        r = requests.put(url,auth=self.auth,params={"organization_id":org_id})
-
-        return r.json()
+    def mapping_done(self, file_id):
+        tasks.finish_mapping(file_id,True)
 
     """ Attempts to find existing entries in PropertyState that correspond to the
         same property that was uploaded and merge them into a new entry"""
-    def start_system_matching(self, file_id, org_id):
-        url = self.url_base + '/api/v2/import_files/%(file_id)s/start_system_matching/' % {'file_id':file_id}
-
-        r = requests.post(url,auth=self.auth,params={"organization_id":org_id})
-
-        return r.json()
+    def start_system_matching(self, file_id):
+        return tasks.match_buildings(file_id)
 
     """ adds a green_assessment_property to a recently uploaded property.
         If another file has been merged with the property since the file with
@@ -230,11 +218,8 @@ class AutoLoad:
         if (r.json()['status'] == 'error'):
             return r.json()
 
-        print r.json()
         green_properties = r.json()['data']
-        print green_properties
         filter(lambda p:p['view']['id'] == view['id'],green_properties)
-        print green_properties
 
         #either update record or create new record
         assessment_data.update({"view":view['id']})
