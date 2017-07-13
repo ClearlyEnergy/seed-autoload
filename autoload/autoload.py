@@ -219,14 +219,32 @@ class AutoLoad:
         filter(lambda p:p['state']['import_file_id'] == file_id,views)
 
         if (len(views) == 0):
-            return {'status':'error'}`
+            return {'status':'error'}
 
         view = views[0]
 
-        # Create a green_assessment_property associated with this view
+        # Try to find an existing assessment for this view
         url = self.url_base + '/api/v2/green_assessment_properties/'
-        assessment_data.update({"view":view['id']})
+        r = requests.get(url,auth=self.auth,params={"organization_id":org_id})
 
-        r = requests.post(url,auth=self.auth,data=assessment_data,params={"organization_id":org_id})
+        if (r.json()['status'] == 'error'):
+            return r.json()
+
+        print r.json()
+        green_properties = r.json()['data']
+        print green_properties
+        filter(lambda p:p['view']['id'] == view['id'],green_properties)
+        print green_properties
+
+        #either update record or create new record
+        assessment_data.update({"view":view['id']})
+        if(len(green_properties) == 0):
+            #no view found, create new record
+            url = self.url_base + '/api/v2/green_assessment_properties/'
+            r = requests.post(url,auth=self.auth,data=assessment_data,params={"organization_id":org_id})
+        else:
+            green_prop = green_properties[0]
+            url = self.url_base + '/api/v2/green_assessment_properties/' + str(green_prop['id']) + '/'
+            r = requests.put(url,auth=self.auth,data=assessment_data,params={"organization_id":org_id})
 
         return r.json()
