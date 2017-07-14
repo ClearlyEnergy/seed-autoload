@@ -1,7 +1,8 @@
 import os
+import time
 
-from requests.auth import HTTPBasicAuth
 import requests
+from requests.auth import HTTPBasicAuth
 
 from django.core.files.storage import FileSystemStorage
 from django.conf import settings
@@ -64,6 +65,7 @@ class AutoLoad:
         prog = 0
         while prog < 100:
             prog = int(get_cache(key)['progress'])
+            time.sleep(1)
 
     """Create a new import record for the specified organization with the
        specified name"""
