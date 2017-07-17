@@ -1,26 +1,39 @@
-"""Test for the autload module"""
-import unittest
-
-from autoload import autoload
+"""Test for the autoload module"""
+import autoload
 import StringIO
 
-# These tests assume that the seed server is running at the location specified
-# in urlbase. It might be a good idea to have the test suite start the server
-# automaticly at some known location. Like wise, they assume that the 
-# authorization provided is correct. have the tests make a test user and org
-# after connecting to the server might also be a good idea. The tests will also 
-# make changes to the database that the server connects to. It would be ideal 
-# to have the tests reverse all changes or perhaps make changes to some 
-# temporary test db.
-class AutoloadTest(unittest.TestCase):
+from django.test import TestCase
+from django.utils import timezone
+from seed.landing.models import SEEDUser as User
+from seed.lib.superperms.orgs.models import Organization, OrganizationUser
+from seed.models import Cycle
 
-    def __init__(self,args):
-        # Change these values to reflect local setup
-        urlbase = "http://localhost:8000"
-        self.loader = autoload.AutoLoad(urlbase,'demo@example.com','676e837f22c17b6321a58d03ea0333a058005a20')
-        unittest.TestCase.__init__(self,args)
+class AutoloadTest(TestCase):
 
-    # Tests tha all api calls made by the loader are successfull
+    def setUp(self):
+        user_details = {
+            'username': 'test_user@demo.com',
+            'password': 'test_pass',
+        }
+        self.user = User.objects.create(username='test_user@demo.com')
+        self.user.set_password('test_pass')
+        self.user.email = 'test_user@demo.com'
+        self.user.save()
+
+        self.org = Organization.objects.create()
+        OrganizationUser.objects.create(user=self.user, organization=self.org)
+
+        self.user.default_organization_id = self.org.id
+        self.user.save()
+
+        self.client.login(username='test_user@demo.com',password='test_pass')
+
+        self.cycle = Cycle.objects.create(organization=self.org,user=self.user,name="test",start=timezone.now(),end=timezone.now())
+        self.cycle.save()
+
+        self.loader = autoload.AutoLoad(self.user,self.org)
+
+    # Tests that individual method calls are successfull
     def test_autoload(self):
         col_mappings = [{"from_field": "Address",
                      "to_field": "address_line_1",
@@ -32,43 +45,11 @@ class AutoloadTest(unittest.TestCase):
                     }]
         file_handle = StringIO.StringIO('Address,klfjgkldsjg\n123 Test Road,100')
         dataset_name = 'TEST'
-        cycle_id = '1'
-        org_id = '1'
 
-        # make a new data set
-        resp = self.loader.create_dataset(dataset_name, org_id)
-        self.assertEqual(resp['status'], 'success')
-        dataset_id = resp['id']
+        resp = self.loader.autoload_file(file_handle,dataset_name,self.cycle.pk,col_mappings)
+        assertEqual(resp['status'],'success')
 
-        # upload and save to Property state table
-        resp = self.loader.upload(file_handle,dataset_id)
-        self.assertEqual(resp['success'], True)
-        file_id = resp['import_file_id']
-
-        resp = self.loader.save_raw_data(file_id,cycle_id,org_id)
-        self.assertEqual(resp['status'], 'not-started')
-        save_prog_key = resp['progress_key']
-        self.loader.wait_for_task(save_prog_key)
-
-
-        # perform column mapping
-        self.loader.save_column_mappings(org_id, file_id, col_mappings)
-        resp = self.loader.perform_mapping(file_id,org_id)
-        self.assertEqual(resp['status'], 'success')
-        map_prog_key = resp['progress_key']
-
-        self.loader.wait_for_task(map_prog_key)
-        resp = self.loader.mapping_done(file_id,org_id)
-        self.assertEqual(resp['status'], 'success')
-
-
-        # attempt to match with existing records
-        resp = self.loader.start_system_matching(file_id,org_id)
-        self.assertEqual(resp['status'], 'success')
-        match_prog_key = resp['progress_key']
-        self.loader.wait_for_task(match_prog_key)
-
-    def test_green_assessment_property(self):
+    def _test_green_assessment_property(self):
         col_mappings = [{"from_field": "Address",
                      "to_field": "address_line_1",
                      "to_table_name": "PropertyState",
@@ -79,10 +60,8 @@ class AutoloadTest(unittest.TestCase):
                     }]
         file_handle = StringIO.StringIO('Address,klfjgkldsjg\n123 Test Road,100')
         dataset_name = 'TEST'
-        cycle_id = '1'
-        org_id = '1'
 
-        resp = self.loader.autoload_file(file_handle,dataset_name,cycle_id,org_id,col_mappings)
+        resp = self.loader.autoload_file(file_handle,dataset_name,self.cycle.pk,col_mappings)
         # check that the upload of initial data succeeds
         self.assertEqual(resp['status'],'success')
         file_id = resp['import_file_id']
@@ -92,7 +71,7 @@ class AutoloadTest(unittest.TestCase):
                             "date":"2017-07-10",
                             "assessment":"1"}
 
-        resp = self.loader.create_green_assessment_property(file_id,green_assessment,org_id)
+        resp = self.loader.create_green_assessment_property(file_id,green_assessment,self.org.pk,'123 Test Road')
 
         self.assertEqual(resp['status'],'success')
 
