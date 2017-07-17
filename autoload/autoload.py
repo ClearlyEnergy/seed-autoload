@@ -9,9 +9,12 @@ from django.conf import settings
 from django.utils import timezone
 
 import seed.data_importer.tasks as tasks
+from seed.models.certification import GreenAssessmentProperty
+from seed.models.properties import PropertyView
 from seed.models import (
     Cycle,
-    Column)
+    Column
+)
 from seed.data_importer.models import (
     ImportFile,
     ImportRecord
@@ -195,43 +198,12 @@ class AutoLoad:
             :Parameter: assessment
             :Description:  id of associated green assessment
     """
-    def create_green_assessment_property(self, file_id, assessment_data, org_id):
-        # Retreive list of property views
-        url = self.url_base + '/api/v2/property_views/'
+    def create_green_assessment_property(self, file_id, assessment_data, org_id, address):
+        view = PropertyView.objects.filter(state__address_line_1=address)
+        green_property,created = GreenAssessmentProperty.objects.update_or_create(view=view[0],defaults=assessment_data)
 
-        r = requests.get(url,auth=self.auth)
-
-        if (r.json()['status'] == 'error'):
-            return r.json()
-
-        # Find property with file_id and correct source type
-        views = r.json()['property_views']
-        filter(lambda p:p['state']['import_file_id'] == file_id,views)
-
-        if (len(views) == 0):
-            return {'status':'error'}
-
-        view = views[0]
-
-        # Try to find an existing assessment for this view
-        url = self.url_base + '/api/v2/green_assessment_properties/'
-        r = requests.get(url,auth=self.auth,params={"organization_id":org_id})
-
-        if (r.json()['status'] == 'error'):
-            return r.json()
-
-        green_properties = r.json()['data']
-        filter(lambda p:p['view']['id'] == view['id'],green_properties)
-
-        #either update record or create new record
-        assessment_data.update({"view":view['id']})
-        if(len(green_properties) == 0):
-            #no view found, create new record
-            url = self.url_base + '/api/v2/green_assessment_properties/'
-            r = requests.post(url,auth=self.auth,data=assessment_data,params={"organization_id":org_id})
+        if(created):
+            green_property.initialize_audit_logs()
         else:
-            green_prop = green_properties[0]
-            url = self.url_base + '/api/v2/green_assessment_properties/' + str(green_prop['id']) + '/'
-            r = requests.put(url,auth=self.auth,data=assessment_data,params={"organization_id":org_id})
-
-        return r.json()
+            green_property.log()
+        return {'status':'success'}
