@@ -1,9 +1,6 @@
 import os
 import time
 
-import requests
-from requests.auth import HTTPBasicAuth
-
 from django.core.files.storage import FileSystemStorage
 from django.conf import settings
 from django.utils import timezone
@@ -20,10 +17,6 @@ from seed.data_importer.models import (
     ImportRecord
 )
 from seed.utils.cache import get_cache
-
-def test():
-    """Entry point for the application script"""
-    return("Call your main application code here")    
 
 class AutoLoad:
     def __init__(self, user, org):

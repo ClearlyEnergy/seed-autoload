@@ -14,10 +14,6 @@ from seed.models import Cycle
 class AutoloadTest(TestCase):
 
     def setUp(self):
-        user_details = {
-            'username': 'test_user@demo.com',
-            'password': 'test_pass',
-        }
         self.user = User.objects.create(username='test_user@demo.com')
         self.user.set_password('test_pass')
         self.user.email = 'test_user@demo.com'
