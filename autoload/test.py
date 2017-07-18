@@ -11,6 +11,10 @@ from seed.models.certification import GreenAssessment, GreenAssessmentProperty
 from seed.lib.superperms.orgs.models import Organization, OrganizationUser
 from seed.models import Cycle
 
+########
+####TODO write test for updating existing GreenAssessmentProperty
+########
+
 class AutoloadTest(TestCase):
 
     def setUp(self):
@@ -92,13 +96,6 @@ class AutoloadTest(TestCase):
 
         self.assertTrue(GreenAssessmentProperty.objects.filter(assessment=assessment,_metric=10,date='2017-07-10').exists())
 
-    def test_is_string(self):
-        print self
-        s = autoload.test()
-        print s
-        self.assertTrue(isinstance(s, basestring))
-        
-        
 # Things to test (sketch)
 # Success, i.e. test for succesful completion of entire process
 # Failure if column headers don't match and/or column names can't be mapped automatically

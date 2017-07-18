@@ -6,7 +6,7 @@ from django.conf import settings
 from django.utils import timezone
 
 import seed.data_importer.tasks as tasks
-from seed.models.certification import GreenAssessmentProperty
+from seed.models.certification import GreenAssessmentProperty, GreenAssessmentPropertyAuditLog
 from seed.models.properties import PropertyView
 from seed.models import (
     Cycle,
@@ -193,10 +193,22 @@ class AutoLoad:
     """
     def create_green_assessment_property(self, file_id, assessment_data, org_id, address):
         view = PropertyView.objects.filter(state__address_line_1=address)
-        green_property,created = GreenAssessmentProperty.objects.update_or_create(view=view[0],defaults=assessment_data)
 
-        if(created):
+        property_list = GreenAssessmentProperty.objects.filter(view=view[0])
+
+        if(not property_list.exists()):
+            assessment_data.update({'view':view[0]})
+            green_property = GreenAssessmentProperty.objects.create(**assessment_data)
             green_property.initialize_audit_logs()
+            green_property.save()
         else:
-            green_property.log()
+            green_property = property_list[0]
+            old_pk = green_property.pk
+            old_audit_log = GreenAssessmentPropertyAuditLog.objects.filter(greenassessmentproperty=green_property).order_by('created').last()
+            green_property.pk = None
+            for (key, value) in assessment_data.items():
+                setattr(green_property, key, value)
+            green_property.save()
+            green_property.log(changed_fields=assessment_data,ancestor=old_audit_log.ancestor,parent=old_audit_log)
+
         return {'status':'success'}
