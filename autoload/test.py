@@ -11,10 +11,6 @@ from seed.models.certification import GreenAssessment, GreenAssessmentProperty
 from seed.lib.superperms.orgs.models import Organization, OrganizationUser
 from seed.models import Cycle
 
-########
-####TODO write test for updating existing GreenAssessmentProperty
-########
-
 class AutoloadTest(TestCase):
 
     def setUp(self):
@@ -59,7 +55,7 @@ class AutoloadTest(TestCase):
                      "to_field": "energy_score",
                      "to_table_name": "PropertyState",
                     }]
-        file_handle = StringIO.StringIO('Address,klfjgkldsjg\n123 Test Road,100')
+        file_handle = 'Address,klfjgkldsjg\n123 Test Road,100'
         dataset_name = 'TEST'
 
         resp = self.loader.autoload_file(file_handle,dataset_name,self.cycle.pk,col_mappings)
@@ -79,7 +75,7 @@ class AutoloadTest(TestCase):
                      "to_field": "energy_score",
                      "to_table_name": "PropertyState",
                     }]
-        file_handle = StringIO.StringIO('Address,klfjgkldsjg\n123 Test Road,100')
+        file_handle = 'Address,klfjgkldsjg\n123 Test Road,100'
         dataset_name = 'TEST'
 
         resp = self.loader.autoload_file(file_handle,dataset_name,self.cycle.pk,col_mappings)
@@ -108,7 +104,7 @@ class AutoloadTest(TestCase):
                      "to_field": "energy_score",
                      "to_table_name": "PropertyState",
                     }]
-        file_handle = StringIO.StringIO('Address,klfjgkldsjg\n123 Test Road,100')
+        file_handle = 'Address,klfjgkldsjg\n123 Test Road,100'
         dataset_name = 'TEST'
 
         resp = self.loader.autoload_file(file_handle,dataset_name,self.cycle.pk,col_mappings)

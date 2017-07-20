@@ -23,12 +23,12 @@ class AutoLoad:
         self.org = org
         self.user = user
 
-    def autoload_file(self, file_handle, dataset_name, cycle_id,  col_mappings):
+    def autoload_file(self, data, dataset_name, cycle_id,  col_mappings):
         # make a new data set
         dataset_id =  self.create_dataset(dataset_name)
 
         # upload and save to Property state table
-        file_id = self.upload(file_handle, dataset_id, cycle_id)
+        file_id = self.upload(data, dataset_id, cycle_id)
 
         resp = self.save_raw_data(file_id)
         if (resp['status'] == 'error'):
@@ -78,7 +78,7 @@ class AutoLoad:
         return record.id
 
     """Upload a file to the specified import record"""
-    def upload(self, the_file, record_id, cycle_id):
+    def upload(self, data, record_id, cycle_id):
         filename = "autoload"
         path = settings.MEDIA_ROOT + "/uploads/" + filename
         path = FileSystemStorage().get_available_name(path)
@@ -89,8 +89,7 @@ class AutoLoad:
 
         # save the file
         with open(path, 'wb+') as temp_file:
-            for line in the_file:
-                temp_file.write(line)
+            temp_file.write(data)
 
         record = ImportRecord.objects.get(pk=record_id)
 
