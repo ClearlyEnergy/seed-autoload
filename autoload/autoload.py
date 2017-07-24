@@ -199,7 +199,7 @@ class AutoLoad:
 
         property_list = GreenAssessmentProperty.objects.filter(view=view[0])
 
-        if(not property_list.exists()):
+        if(not property_list.exists() or property_list[0].assessment != assessment_data['assessment']):
             assessment_data.update({'view': view[0]})
             green_property = GreenAssessmentProperty.objects.create(**assessment_data)
             green_property.initialize_audit_logs()
