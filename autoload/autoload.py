@@ -6,7 +6,10 @@ from django.conf import settings
 from django.utils import timezone
 
 import seed.data_importer.tasks as tasks
-from seed.models.certification import GreenAssessmentProperty, GreenAssessmentPropertyAuditLog
+from seed.models.certification import (
+    GreenAssessmentProperty,
+    GreenAssessmentPropertyAuditLog
+)
 from seed.models.properties import PropertyView
 from seed.models import (
     Cycle,
@@ -18,6 +21,7 @@ from seed.data_importer.models import (
 )
 from seed.utils.cache import get_cache
 
+
 class AutoLoad:
     def __init__(self, user, org):
         self.org = org
@@ -25,7 +29,7 @@ class AutoLoad:
 
     def autoload_file(self, data, dataset_name, cycle_id,  col_mappings):
         # make a new data set
-        dataset_id =  self.create_dataset(dataset_name)
+        dataset_id = self.create_dataset(dataset_name)
 
         # upload and save to Property state table
         file_id = self.upload(data, dataset_id, cycle_id)
@@ -53,7 +57,7 @@ class AutoLoad:
         match_prog_key = resp['progress_key']
         self.wait_for_task(match_prog_key)
 
-        return {'status':'success','import_file_id':file_id}
+        return {'status': 'success', 'import_file_id': file_id}
 
     """Make repeated calls to progress API endpoint until progress is
        Reported to be completed (progress == 100)"""
@@ -71,9 +75,9 @@ class AutoLoad:
                 app='seed',
                 start_time=timezone.now(),
                 created_at=timezone.now(),
-                last_modified_by = self.user,
-                super_organization = self.org,
-                owner = self.user
+                last_modified_by=self.user,
+                super_organization=self.org,
+                owner=self.user
         )
         return record.id
 
@@ -94,10 +98,10 @@ class AutoLoad:
         record = ImportRecord.objects.get(pk=record_id)
 
         f = ImportFile.objects.create(
-                import_record = record,
-                uploaded_filename = filename,
+                import_record=record,
+                uploaded_filename=filename,
                 file=path,
-                cycle = Cycle.objects.get(pk=cycle_id),
+                cycle=Cycle.objects.get(pk=cycle_id),
                 source_type="Assessed Raw")
         return f.pk
 
@@ -124,7 +128,7 @@ class AutoLoad:
     def save_column_mappings(self, file_id, mappings):
         import_file = ImportFile.objects.get(pk=file_id)
         org = self.org
-        status1 = Column.create_mappings(mappings,org,self.user)
+        status1 = Column.create_mappings(mappings, org, self.user)
 
         column_mappings = [
             {'from_field': m['from_field'],
@@ -133,9 +137,9 @@ class AutoLoad:
 
         if status1:
             import_file.save_cached_mapped_columns(column_mappings)
-            return {'status':'success'}
+            return {'status': 'success'}
         else:
-            return {'status':'error'}
+            return {'status': 'error'}
 
     """ Populate fields in PropertyState according to previously established
         Mapping"""
@@ -145,7 +149,7 @@ class AutoLoad:
     """ The server needs to be informed that we are finished with all mapping
         for this file. Not sure what exactly this does but it seems important"""
     def mapping_done(self, file_id):
-        tasks.finish_mapping(file_id,True)
+        tasks.finish_mapping(file_id, True)
 
     """ Attempts to find existing entries in PropertyState that correspond to the
         same property that was uploaded and merge them into a new entry"""
@@ -157,38 +161,38 @@ class AutoLoad:
         the given id was uploaded then this method will fail.
 
         assesssment_data must be a dictionart with entries:
-            :Parameter: source
-            :Description:  source of this certification e.g. assessor
-            :required: false
-            :Parameter: status
-            :Description:  status for multi-step processes
-            :required: false
-            :Parameter: status_date
-            :Description:  date status first applied
-            :required: false
-            :Parameter: metric
-            :Description:  score if value is numeric
-            :required: false
-            :Parameter: rating
-            :Description:  score if value is non-numeric
-            :required: false
-            :Parameter: version
-            :Description:  version of certification issued
-            :required: false
-            :Parameter: date
-            :Description:  date certification issued  ``YYYY-MM-DD``
-            :required: false
-            :Parameter: target_date
-            :Description:  date achievement expected ``YYYY-MM-DD``
-            :required: false
-            :Parameter: eligibility
-            :Description:  BEDES eligible if true
-            :required: false
-            :Parameter: urls
-            :Description:  array of related green assessment urls
-            :required: false
-            :Parameter: assessment
-            :Description:  id of associated green assessment
+            : Parameter: source
+            : Description:  source of this certification e.g. assessor
+            : required: false
+            : Parameter: status
+            : Description:  status for multi-step processes
+            : required: false
+            : Parameter: status_date
+            : Description:  date status first applied
+            : required: false
+            : Parameter: metric
+            : Description:  score if value is numeric
+            : required: false
+            : Parameter: rating
+            : Description:  score if value is non-numeric
+            : required: false
+            : Parameter: version
+            : Description:  version of certification issued
+            : required: false
+            : Parameter: date
+            : Description:  date certification issued  ``YYYY-MM-DD``
+            : required: false
+            : Parameter: target_date
+            : Description:  date achievement expected ``YYYY-MM-DD``
+            : required: false
+            : Parameter: eligibility
+            : Description:  BEDES eligible if true
+            : required: false
+            : Parameter: urls
+            : Description:  array of related green assessment urls
+            : required: false
+            : Parameter: assessment
+            : Description:  id of associated green assessment
     """
     def create_green_assessment_property(self, file_id, assessment_data, org_id, address):
         view = PropertyView.objects.filter(state__address_line_1=address)
@@ -196,18 +200,20 @@ class AutoLoad:
         property_list = GreenAssessmentProperty.objects.filter(view=view[0])
 
         if(not property_list.exists()):
-            assessment_data.update({'view':view[0]})
+            assessment_data.update({'view': view[0]})
             green_property = GreenAssessmentProperty.objects.create(**assessment_data)
             green_property.initialize_audit_logs()
             green_property.save()
         else:
             green_property = property_list[0]
-            old_pk = green_property.pk
             old_audit_log = GreenAssessmentPropertyAuditLog.objects.filter(greenassessmentproperty=green_property).order_by('created').last()
             green_property.pk = None
             for (key, value) in assessment_data.items():
                 setattr(green_property, key, value)
             green_property.save()
-            green_property.log(changed_fields=assessment_data,ancestor=old_audit_log.ancestor,parent=old_audit_log)
+            green_property.log(
+                    changed_fields=assessment_data,
+                    ancestor=old_audit_log.ancestor,
+                    parent=old_audit_log)
 
-        return {'status':'success'}
+        return {'status': 'success'}
