@@ -8,6 +8,7 @@ from django.utils import timezone
 import seed.data_importer.tasks as tasks
 from seed.models.certification import (
     GreenAssessmentProperty,
+    GreenAssessmentURL,
     GreenAssessmentPropertyAuditLog
 )
 from seed.models.properties import PropertyView
@@ -199,6 +200,10 @@ class AutoLoad:
 
         property_list = GreenAssessmentProperty.objects.filter(view=view[0])
 
+        # pull urls out of dict for use later
+        green_assessment_urls = assessment_data.pop('urls',[])
+
+        green_property = None
         if(not property_list.exists() or property_list[0].assessment != assessment_data['assessment']):
             assessment_data.update({'view': view[0]})
             green_property = GreenAssessmentProperty.objects.create(**assessment_data)
@@ -215,5 +220,11 @@ class AutoLoad:
                     changed_fields=assessment_data,
                     ancestor=old_audit_log.ancestor,
                     parent=old_audit_log)
+
+        for url in green_assessment_urls:
+            if (url != ''):
+                GreenAssessmentURL.objects.create(
+                     url=url,
+                     property_assessment=green_property)
 
         return {'status': 'success'}
