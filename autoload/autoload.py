@@ -12,10 +12,7 @@ from seed.models.certification import (
     GreenAssessmentPropertyAuditLog
 )
 from seed.models.properties import PropertyView
-from seed.models import (
-    Cycle,
-    Column
-)
+from seed.models import Column, Cycle
 from seed.data_importer.models import (
     ImportFile,
     ImportRecord
@@ -28,9 +25,9 @@ class AutoLoad:
         self.org = org
         self.user = user
 
-    def autoload_file(self, data, dataset_name, cycle_id,  col_mappings):
-        # make a new data set
-        dataset_id = self.create_dataset(dataset_name)
+    def autoload_file(self, data, dataset, cycle,  col_mappings):
+        dataset_id = dataset.pk
+        cycle_id = cycle.pk
 
         # upload and save to Property state table
         file_id = self.upload(data, dataset_id, cycle_id)
