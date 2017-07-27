@@ -192,7 +192,7 @@ class AutoLoad:
             : Parameter: assessment
             : Description:  id of associated green assessment
     """
-    def create_green_assessment_property(self, file_id, assessment_data, org_id, address):
+    def create_green_assessment_property(self, assessment_data, address):
         view = PropertyView.objects.filter(state__address_line_1=address)
 
         property_list = GreenAssessmentProperty.objects.filter(view=view[0])
