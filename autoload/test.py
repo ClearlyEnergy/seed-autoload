@@ -9,6 +9,7 @@ from seed.models.properties import PropertyState
 from seed.models.certification import GreenAssessment, GreenAssessmentProperty
 from seed.lib.superperms.orgs.models import Organization, OrganizationUser
 from seed.models import Cycle
+from seed.data_importer.models import ImportRecord
 
 
 class AutoloadTest(TestCase):
@@ -35,6 +36,17 @@ class AutoloadTest(TestCase):
             end=timezone.now())
         self.cycle.save()
 
+        self.dataset = ImportRecord.objects.create(
+                name='test',
+                app='seed',
+                start_time=timezone.now(),
+                created_at=timezone.now(),
+                last_modified_by=self.user,
+                super_organization=self.org,
+                owner=self.user
+        )
+        self.dataset.save()
+
         self.loader = autoload.AutoLoad(self.user, self.org)
 
         self.assessment = GreenAssessment.objects.create(
@@ -46,6 +58,7 @@ class AutoloadTest(TestCase):
                 is_integer_score=True,
                 validity_duration=datetime.timedelta(days=365),
                 organization=self.org)
+        self.cycle.save()
 
     # test that autoload returns with succes and that there exists a
     # property state with the correct file_id
@@ -57,10 +70,9 @@ class AutoloadTest(TestCase):
             {"from_field": "Score",
              "to_field": "energy_score",
              "to_table_name": "PropertyState"}]
-        file_handle = 'Address, klfjgkldsjg\n123 Test Road, 100'
-        dataset_name = 'TEST'
+        data = 'Address, klfjgkldsjg\n123 Test Road, 100'
 
-        resp = self.loader.autoload_file(file_handle, dataset_name, self.cycle.pk, col_mappings)
+        resp = self.loader.autoload_file(data, self.dataset, self.cycle, col_mappings)
         self.assertEqual(resp['status'], 'success')
 
         file_id = resp['import_file_id']
@@ -80,7 +92,7 @@ class AutoloadTest(TestCase):
         file_handle = 'Address, klfjgkldsjg\n123 Test Road, 100'
         dataset_name = 'TEST'
 
-        resp = self.loader.autoload_file(file_handle, dataset_name, self.cycle.pk, col_mappings)
+        resp = self.loader.autoload_file(file_handle, self.dataset, self.cycle, col_mappings)
         # check that the upload of initial data succeeds
         self.assertEqual(resp['status'], 'success')
         file_id = resp['import_file_id']
@@ -90,7 +102,7 @@ class AutoloadTest(TestCase):
                             "date": "2017-07-10",
                             "assessment": self.assessment}
 
-        resp = self.loader.create_green_assessment_property(file_id, green_assessment, self.org.pk, '123 Test Road')
+        resp = self.loader.create_green_assessment_property(green_assessment, '123 Test Road')
 
         # check that GreenAssessmentProperty upload succeeds
         self.assertEqual(resp['status'], 'success')
@@ -109,7 +121,7 @@ class AutoloadTest(TestCase):
         file_handle = 'Address, klfjgkldsjg\n123 Test Road, 100'
         dataset_name = 'TEST'
 
-        resp = self.loader.autoload_file(file_handle, dataset_name, self.cycle.pk, col_mappings)
+        resp = self.loader.autoload_file(file_handle, self.dataset, self.cycle, col_mappings)
         # check that the upload of initial data succeeds
         self.assertEqual(resp['status'], 'success')
         file_id = resp['import_file_id']
@@ -119,7 +131,7 @@ class AutoloadTest(TestCase):
                             "date": "2017-07-10",
                             "assessment": self.assessment}
 
-        resp = self.loader.create_green_assessment_property(file_id, green_assessment, self.org.pk, '123 Test Road')
+        resp = self.loader.create_green_assessment_property(green_assessment, '123 Test Road')
 
         # check that GreenAssessmentProperty upload succeeds
         self.assertEqual(resp['status'], 'success')
@@ -127,9 +139,10 @@ class AutoloadTest(TestCase):
         self.assertTrue(GreenAssessmentProperty.objects.filter(assessment=self.assessment, _metric=10, date='2017-07-10').exists())
 
         green_assessment_update = {"metric": 11,
-                                   "date": "2017-07-19"}
+                                   "date": "2017-07-19",
+                                   "assessment": self.assessment}
 
-        resp = self.loader.create_green_assessment_property(file_id, green_assessment_update, self.org.pk, '123 Test Road')
+        resp = self.loader.create_green_assessment_property(green_assessment_update, '123 Test Road')
 
         # check that GreenAssessmentProperty update succeeds
         self.assertEqual(resp['status'], 'success')
