@@ -30,7 +30,7 @@ class AutoLoad:
         cycle_id = cycle.pk
 
         # upload and save to Property state table
-        file_id = self.upload(data, dataset_id, cycle_id)
+        file_id = self.upload(data, dataset, cycle)
 
         resp = self.save_raw_data(file_id)
         if (resp['status'] == 'error'):
@@ -80,7 +80,7 @@ class AutoLoad:
         return record.id
 
     """Upload a file to the specified import record"""
-    def upload(self, data, record_id, cycle_id):
+    def upload(self, data, dataset, cycle):
         filename = "autoload"
         path = settings.MEDIA_ROOT + "/uploads/" + filename
         path = FileSystemStorage().get_available_name(path)
@@ -93,13 +93,11 @@ class AutoLoad:
         with open(path, 'wb+') as temp_file:
             temp_file.write(data)
 
-        record = ImportRecord.objects.get(pk=record_id)
-
         f = ImportFile.objects.create(
-                import_record=record,
+                import_record=dataset,
                 uploaded_filename=filename,
                 file=path,
-                cycle=Cycle.objects.get(pk=cycle_id),
+                cycle=cycle,
                 source_type="Assessed Raw")
         return f.pk
 
