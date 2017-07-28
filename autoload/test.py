@@ -148,3 +148,35 @@ class AutoloadTest(TestCase):
         self.assertEqual(resp['status'], 'success')
 
         self.assertTrue(GreenAssessmentProperty.objects.filter(assessment=self.assessment, _metric=11, date='2017-07-19').exists())
+
+    def test_green_assessment_expire(self):
+        col_mappings = [
+            {"from_field": "Address",
+             "to_field": "address_line_1",
+             "to_table_name": "PropertyState"},
+            {"from_field": "Score",
+             "to_field": "energy_score",
+             "to_table_name": "PropertyState"}]
+
+        file_handle = 'Address, klfjgkldsjg\n123 Test Road, 100'
+        dataset_name = 'TEST'
+
+        resp = self.loader.autoload_file(file_handle, self.dataset, self.cycle, col_mappings)
+        # check that the upload of initial data succeeds
+        self.assertEqual(resp['status'], 'success')
+        file_id = resp['import_file_id']
+
+        green_assessment = {"source": "home energy score",
+                            "metric": 10,
+                            "date": "2017-07-10",
+                            "assessment": self.assessment}
+
+        resp = self.loader.create_green_assessment_property(green_assessment, '123 Test Road')
+
+        # check that GreenAssessmentProperty upload succeeds
+        self.assertEqual(resp['status'], 'success')
+
+        self.assertTrue(GreenAssessmentProperty.objects.filter(assessment=self.assessment, _metric=10, date='2017-07-10').exists())
+
+        # finaly check expiration date is correct
+        self.assertEqual(GreenAssessmentProperty.objects.get(assessment=self.assessment, _metric=10, date='2017-07-10').expiration_date,datetime.date(2018,7,10))
