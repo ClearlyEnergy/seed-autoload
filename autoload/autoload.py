@@ -5,8 +5,8 @@ from django.core.files.storage import FileSystemStorage
 from django.conf import settings
 
 import seed.data_importer.tasks as tasks
+from helix.models import HELIXGreenAssessmentProperty
 from seed.models.certification import (
-    GreenAssessmentProperty,
     GreenAssessmentURL,
     GreenAssessmentPropertyAuditLog
 )
@@ -180,14 +180,14 @@ class AutoLoad:
         green_assessment_urls = assessment_data.pop('urls', [])
 
         green_property = None
-        priorAssessments = GreenAssessmentProperty.objects.filter(
+        priorAssessments = HELIXGreenAssessmentProperty.objects.filter(
                 view=view,
                 assessment=assessment_data['assessment'])
         if(not priorAssessments.exists()):
             # If the property does not have an assessment in the database
             # for the specifed assesment type createa new one.
             assessment_data.update({'view': view})
-            green_property = GreenAssessmentProperty.objects.create(**assessment_data)
+            green_property = HELIXGreenAssessmentProperty.objects.create(**assessment_data)
             green_property.initialize_audit_logs()
             green_property.save()
         else:
