@@ -104,8 +104,8 @@ class AutoloadTest(TestCase):
 
         resp = self.loader.create_green_assessment_property(green_assessment, '123 Test Road')
 
-        # check that GreenAssessmentProperty upload succeeds
-        self.assertEqual(resp['status'], 'success')
+        # check that GreenAssessmentProperty update succeeds
+        self.assertNotEqual(resp, None)
 
         self.assertTrue(GreenAssessmentProperty.objects.filter(assessment=self.assessment, _metric=10, date='2017-07-10').exists())
 
@@ -134,7 +134,7 @@ class AutoloadTest(TestCase):
         resp = self.loader.create_green_assessment_property(green_assessment, '123 Test Road')
 
         # check that GreenAssessmentProperty upload succeeds
-        self.assertEqual(resp['status'], 'success')
+        self.assertNotEqual(resp, None)
 
         self.assertTrue(GreenAssessmentProperty.objects.filter(assessment=self.assessment, _metric=10, date='2017-07-10').exists())
 
@@ -145,7 +145,7 @@ class AutoloadTest(TestCase):
         resp = self.loader.create_green_assessment_property(green_assessment_update, '123 Test Road')
 
         # check that GreenAssessmentProperty update succeeds
-        self.assertEqual(resp['status'], 'success')
+        self.assertNotEqual(resp, None)
 
         self.assertTrue(GreenAssessmentProperty.objects.filter(assessment=self.assessment, _metric=11, date='2017-07-19').exists())
 
@@ -174,7 +174,7 @@ class AutoloadTest(TestCase):
         resp = self.loader.create_green_assessment_property(green_assessment, '123 Test Road')
 
         # check that GreenAssessmentProperty upload succeeds
-        self.assertEqual(resp['status'], 'success')
+        self.assertNotEqual(resp, None)
 
         self.assertTrue(GreenAssessmentProperty.objects.filter(assessment=self.assessment, _metric=10, date='2017-07-10').exists())
 

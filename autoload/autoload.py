@@ -5,7 +5,7 @@ from django.core.files.storage import FileSystemStorage
 from django.conf import settings
 
 import seed.data_importer.tasks as tasks
-from helix.models import HELIXGreenAssessmentProperty
+from helix.models import HELIXGreenAssessmentProperty, HelixMeasurement
 from seed.models.certification import (
     GreenAssessmentURL,
     GreenAssessmentPropertyAuditLog
@@ -214,4 +214,9 @@ class AutoLoad:
                      url=url,
                      property_assessment=green_property)
 
-        return {'status': 'success'}
+        return green_property
+
+    def create_measurement(self, assessment_property, **kwargs):
+        kwargs.update({'assessment_property': assessment_property})
+        measurement_record = HelixMeasurement.objects.create(**kwargs)
+        return measurement_record
