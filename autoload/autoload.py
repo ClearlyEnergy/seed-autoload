@@ -5,7 +5,8 @@ from django.core.files.storage import FileSystemStorage
 from django.conf import settings
 
 import seed.data_importer.tasks as tasks
-from helix.models import HELIXGreenAssessmentProperty, HelixMeasurement
+from helix.models import HELIXGreenAssessmentProperty, HELIXGreenAssessment, HelixMeasurement
+import helix.helix_utils
 from seed.models.certification import (
     GreenAssessmentURL,
     GreenAssessmentPropertyAuditLog
@@ -21,9 +22,9 @@ class AutoLoad:
         self.org = org
         self.user = user
 
-    def autoload_file(self, data, dataset, cycle,  col_mappings):
+    def autoload_file(self, file_id, col_mappings):
         # upload and save to Property state table
-        file_id = self.upload(data, dataset, cycle)
+#        file_id = self.upload(data, dataset, cycle)
 
         resp = self.save_raw_data(file_id)
         if (resp['status'] == 'error'):
@@ -170,11 +171,16 @@ class AutoLoad:
             : Parameter: assessment
             : Description:  id of associated green assessment
     """
-    def create_green_assessment_property(self, assessment_data, address):
+    def create_green_assessment_property(self, assessment_data, address1, address2, postal_code):
 
         # a green assessment property needs to be associated with a
         # property view. I'm using address as the key to find the correct view.
-        view = PropertyView.objects.get(state__address_line_1=address)
+        view = PropertyView.objects.filter(state__address_line_1=address1, state__address_line_2=address2, state__postal_code=postal_code)
+        if len(view) > 1:
+            print address1 + ' has duplicates'
+            return
+        else:
+            view = view.first()
 
         # pull urls out of dict for use later
         green_assessment_urls = assessment_data.pop('urls', [])
@@ -218,5 +224,6 @@ class AutoLoad:
 
     def create_measurement(self, assessment_property, **kwargs):
         kwargs.update({'assessment_property': assessment_property})
-        measurement_record = HelixMeasurement.objects.create(**kwargs)
+        measurement_record = HelixMeasurement.objects.get_or_create(**kwargs)
         return measurement_record
+                
