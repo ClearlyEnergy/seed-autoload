@@ -5,9 +5,10 @@ from django.core.files.storage import FileSystemStorage
 from django.conf import settings
 
 import seed.data_importer.tasks as tasks
-from helix.models import HELIXGreenAssessmentProperty, HELIXGreenAssessment, HelixMeasurement
+from helix.models import HELIXGreenAssessmentProperty, HelixMeasurement
 import helix.helix_utils
 from seed.models.certification import (
+    GreenAssessment,
     GreenAssessmentURL,
     GreenAssessmentPropertyAuditLog
 )
@@ -56,9 +57,10 @@ class AutoLoad:
         prog = 0
         while prog < 100:
             prog = int(get_cache(key)['progress'])
+            
             # Call to sleep is required otherwise this method will hang. It
             # could be maybe to reduced less than 1 second.
-            time.sleep(1)
+            time.sleep(1.0)
 
     """Upload a file to the specified import record"""
     def upload(self, data, dataset, cycle):
@@ -171,11 +173,12 @@ class AutoLoad:
             : Parameter: assessment
             : Description:  id of associated green assessment
     """
-    def create_green_assessment_property(self, assessment_data, address1, address2, postal_code):
+    def create_green_assessment_property(self, assessment_data, address, postal_code):
 
         # a green assessment property needs to be associated with a
         # property view. I'm using address as the key to find the correct view.
-        view = PropertyView.objects.filter(state__address_line_1=address1, state__address_line_2=address2, state__postal_code=postal_code)
+        data_log = {'created': False, 'updated': False}
+        view = PropertyView.objects.filter(state__normalized_address=address, state__postal_code=postal_code)
         if len(view) > 1:
             print address1 + ' has duplicates'
             return
@@ -196,6 +199,7 @@ class AutoLoad:
             green_property = HELIXGreenAssessmentProperty.objects.create(**assessment_data)
             green_property.initialize_audit_logs()
             green_property.save()
+            data_log['created'] = True
         else:
             # find most recently created property and a corresponding audit log
             green_property = priorAssessments.order_by('date').last()
@@ -212,15 +216,16 @@ class AutoLoad:
                     changed_fields=assessment_data,
                     ancestor=old_audit_log.ancestor,
                     parent=old_audit_log)
+            data_log['updated'] = True
 
         # add any urls provided in assessment data to the url table
         for url in green_assessment_urls:
             if (url != ''):
-                GreenAssessmentURL.objects.create(
+                GreenAssessmentURL.objects.get_or_create(
                      url=url,
                      property_assessment=green_property)
 
-        return green_property
+        return data_log, green_property
 
     def create_measurement(self, assessment_property, **kwargs):
         kwargs.update({'assessment_property': assessment_property})
