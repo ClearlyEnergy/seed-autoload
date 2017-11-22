@@ -1,5 +1,6 @@
 import os
 import time
+import json
 
 from django.core.files.storage import FileSystemStorage
 from django.conf import settings
@@ -227,8 +228,44 @@ class AutoLoad:
 
         return data_log, green_property
 
+    def setup_measurements(self, headers, row, assessment_property):
+        data = {
+            'created': 0,
+            'updated': 0,
+        }
+        for k in headers:
+            if (k.startswith('CONS') or k.startswith('PROD') or k.startswith('CAP')):
+                dat = json.loads(row[k])
+                # find fuel and measurement type
+                for fuel in list(HelixMeasurement.HES_FUEL_TYPES.keys()):
+                    if fuel in k:
+                        break
+
+                measurement_data = {
+                    'measurement_type': k.split('_')[0],
+                    'fuel':  HelixMeasurement.HES_FUEL_TYPES[fuel],
+                    'quantity': dat['quantity'],
+                    'unit': HelixMeasurement.HES_UNITS[dat['unit']], 
+                    'status': dat['status']}
+                if 'pv' in k:
+                    measurement_data['measurement_subtype'] = 'PV'
+                    if k.startswith('CAP'):
+                        measurement_data['year'] = dat['year']
+                        
+                data_log, meas = self.create_measurement(assessment_property, **measurement_data)
+                data['created'] += data_log['created']
+                data['updated'] += data_log['updated']
+
+        return data_log
+            
     def create_measurement(self, assessment_property, **kwargs):
+        data_log = {'created': False, 'updated': False}
         kwargs.update({'assessment_property': assessment_property})
-        measurement_record = HelixMeasurement.objects.get_or_create(**kwargs)
-        return measurement_record
+        measurement_record, created = HelixMeasurement.objects.get_or_create(**kwargs)
+        if created:
+            data_log['created'] = True
+        else:
+            data_log['updated'] = True
+            
+        return data_log, measurement_record
                 
