@@ -256,7 +256,7 @@ class AutoLoad:
                 data['created'] += data_log['created']
                 data['updated'] += data_log['updated']
 
-        return data_log
+        return data
             
     def create_measurement(self, assessment_property, **kwargs):
         data_log = {'created': False, 'updated': False}
