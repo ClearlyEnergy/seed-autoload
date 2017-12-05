@@ -193,13 +193,19 @@ class AutoLoad:
         priorAssessments = HELIXGreenAssessmentProperty.objects.filter(
                 view=view,
                 assessment=assessment_data['assessment'])
+        print priorAssessments
         if(not priorAssessments.exists()):
             # If the property does not have an assessment in the database
             # for the specifed assesment type createa new one.
+            print 'A'
             assessment_data.update({'view': view})
+            print 'B'
             green_property = HELIXGreenAssessmentProperty.objects.create(**assessment_data)
+            print 'C'
             green_property.initialize_audit_logs()
+            print 'D'
             green_property.save()
+            print 'E'
             data_log['created'] = True
         else:
             # find most recently created property and a corresponding audit log
