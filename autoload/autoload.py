@@ -1,8 +1,8 @@
 import os
-import time
+import time, calendar
 import json
 
-from django.core.files.storage import FileSystemStorage
+from django.core.files.storage import default_storage, FileSystemStorage
 from django.conf import settings
 
 import seed.data_importer.tasks as tasks
@@ -15,9 +15,14 @@ from seed.models.certification import (
 )
 from seed.models.properties import PropertyView
 from seed.models import Column
+from seed.models.auditlog import (
+    AUDIT_USER_EDIT,
+    AUDIT_USER_CREATE,
+    AUDIT_USER_EXPORT,
+    DATA_UPDATE_TYPE
+)
 from seed.data_importer.models import ImportFile
 from seed.utils.cache import get_cache
-
 
 class AutoLoad:
     def __init__(self, user, org):
@@ -26,7 +31,7 @@ class AutoLoad:
 
     def autoload_file(self, file_id, col_mappings):
         # upload and save to Property state table
-#        file_id = self.upload(data, dataset, cycle)
+#        file_id = self.upload('autoload.csv', data, dataset, cycle)
 
         resp = self.save_raw_data(file_id)
         if (resp['status'] == 'error'):
@@ -64,18 +69,23 @@ class AutoLoad:
             time.sleep(1.0)
 
     """Upload a file to the specified import record"""
-    def upload(self, data, dataset, cycle):
-        filename = "autoload"
-        path = settings.MEDIA_ROOT + "/uploads/" + filename
-        path = FileSystemStorage().get_available_name(path)
-
-        # verify the directory exists
-        if not os.path.exists(os.path.dirname(path)):
-            os.makedirs(os.path.dirname(path))
-
-        # save the file
-        with open(path, 'wb+') as temp_file:
+    def upload(self, filename, data, dataset, cycle):
+        if 'S3' in settings.DEFAULT_FILE_STORAGE:
+            path = 'data_imports/' + filename + '.'+ str(calendar.timegm(time.gmtime())/1000)
+            temp_file = default_storage.open(path, 'w')
             temp_file.write(data)
+            temp_file.close()
+        else:        
+            path = settings.MEDIA_ROOT + "/uploads/" + filename
+            path = FileSystemStorage().get_available_name(path)
+
+            # verify the directory exists
+            if not os.path.exists(os.path.dirname(path)):
+                os.makedirs(os.path.dirname(path))
+
+            # save the file
+            with open(path, 'wb+') as temp_file:
+                temp_file.write(data)
 
         f = ImportFile.objects.create(
                 import_record=dataset,
@@ -175,7 +185,7 @@ class AutoLoad:
             : Description:  id of associated green assessment
     """
     def create_green_assessment_property(self, assessment_data, address, postal_code):
-
+        
         # a green assessment property needs to be associated with a
         # property view. I'm using address as the key to find the correct view.
         data_log = {'created': False, 'updated': False}
@@ -193,24 +203,18 @@ class AutoLoad:
         priorAssessments = HELIXGreenAssessmentProperty.objects.filter(
                 view=view,
                 assessment=assessment_data['assessment'])
-        print priorAssessments
         if(not priorAssessments.exists()):
             # If the property does not have an assessment in the database
             # for the specifed assesment type createa new one.
-            print 'A'
             assessment_data.update({'view': view})
-            print 'B'
             green_property = HELIXGreenAssessmentProperty.objects.create(**assessment_data)
-            print 'C'
-            green_property.initialize_audit_logs()
-            print 'D'
+            green_property.initialize_audit_logs(user=self.user)
             green_property.save()
-            print 'E'
             data_log['created'] = True
         else:
             # find most recently created property and a corresponding audit log
             green_property = priorAssessments.order_by('date').last()
-            old_audit_log = GreenAssessmentPropertyAuditLog.objects.filter(greenassessmentproperty=green_property).order_by('created').last()
+            old_audit_log = GreenAssessmentPropertyAuditLog.objects.filter(greenassessmentproperty=green_property).exclude(record_type=AUDIT_USER_EXPORT).order_by('created').last()
 
             # update fields
             green_property.pk = None
@@ -222,7 +226,8 @@ class AutoLoad:
             green_property.log(
                     changed_fields=assessment_data,
                     ancestor=old_audit_log.ancestor,
-                    parent=old_audit_log)
+                    parent=old_audit_log,
+                    user=self.user)
             data_log['updated'] = True
 
         # add any urls provided in assessment data to the url table
