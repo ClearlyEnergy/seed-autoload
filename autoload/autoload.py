@@ -189,7 +189,7 @@ class AutoLoad:
         # a green assessment property needs to be associated with a
         # property view. I'm using address as the key to find the correct view.
         data_log = {'created': False, 'updated': False}
-        view = PropertyView.objects.filter(state__normalized_address=address, state__postal_code=postal_code)
+        view = PropertyView.objects.filter(state__normalized_address=address, state__postal_code=postal_code, state__organization=self.org)
         if len(view) > 1:
             print address1 + ' has duplicates'
             return
