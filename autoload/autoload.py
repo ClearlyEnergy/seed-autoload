@@ -191,7 +191,7 @@ class AutoLoad:
         data_log = {'created': False, 'updated': False}
         view = PropertyView.objects.filter(state__normalized_address=address, state__postal_code=postal_code, state__organization=self.org)
         if len(view) > 1:
-            print address1 + ' has duplicates'
+            print(address1 + ' has duplicates')
             return
         else:
             view = view.first()
