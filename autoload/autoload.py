@@ -203,6 +203,11 @@ class AutoLoad:
         priorAssessments = HELIXGreenAssessmentProperty.objects.filter(
                 view=view,
                 assessment=assessment_data['assessment'])
+        if 'reference_id' in assessment_data:
+            priorAssessments = priorAssessments.filter(
+                reference_id=assessment_data['reference_id']
+            )
+            
         if(not priorAssessments.exists()):
             # If the property does not have an assessment in the database
             # for the specifed assesment type createa new one.
